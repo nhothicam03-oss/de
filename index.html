@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anime 2D Animation Studio</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="brandmark">A</div><div><b>ANIME 2D STUDIO</b><small>CHARACTER · ANIMATION · FILM</small></div></div>
+    <nav class="mainnav">
+      <button class="nav active" data-workspace="character">Nhân vật</button>
+      <button class="nav" data-workspace="animation">Animation</button>
+      <button class="nav" data-workspace="script">Kịch bản AI</button>
+      <button class="nav" data-workspace="film">Dựng phim</button>
+    </nav>
+    <div class="top-actions">
+      <button id="newProject" class="quiet">＋ Dự án</button>
+      <button id="saveProject" class="quiet">Lưu dự án</button>
+      <button id="exportVideo" class="primary">Xuất video ↗</button>
+    </div>
+  </header>
+  <main class="shell">
+    <aside class="sidebar">
+      <div class="side-head"><span>THƯ VIỆN</span><button id="importFolder" title="Nhập thư mục ảnh">＋</button></div>
+      <label class="search"><span>⌕</span><input id="assetSearch" placeholder="Tìm bộ phận, clip..."></label>
+      <div class="side-tabs"><button class="side-tab active" data-side="assets">Asset</button><button class="side-tab" data-side="clips">Clip</button><button class="side-tab" data-side="scenes">Cảnh</button></div>
+      <section id="assetPanel" class="side-content">
+        <div class="section-label">NHÂN VẬT</div><div id="characterList" class="asset-list"><div class="empty">Chưa có nhân vật. Nhập thư mục PNG hoặc tạo nhân vật mới.</div></div>
+        <div class="section-label row-between">BỘ PHẬN <span id="assetCount">0</span></div>
+        <div id="assetList" class="asset-list"><div class="empty">Chưa có ảnh.</div></div>
+        <button id="addCharacter" class="wide-button">＋ Tạo nhân vật</button>
+        <input id="folderInput" type="file" webkitdirectory directory multiple hidden accept="image/*">
+        <input id="imageInput" type="file" multiple hidden accept="image/png,image/webp,image/jpeg,image/svg+xml">
+      </section>
+      <section id="clipPanel" class="side-content hidden">
+        <div class="section-label">CLIP CƠ BẢN</div>
+        <div id="clipList" class="asset-list"></div>
+        <div class="hint">Chọn clip để thêm vào timeline hoặc nhấn Play để xem thử.</div>
+      </section>
+      <section id="scenePanel" class="side-content hidden">
+        <div class="section-label">CÁC CẢNH</div><div id="sceneList" class="asset-list"></div>
+        <button id="addScene" class="wide-button">＋ Thêm cảnh</button>
+      </section>
+      <div class="sidebar-foot"><span class="dot"></span> Hoạt động cục bộ · Không tải asset lên máy chủ</div>
+    </aside>
+    <section class="workspace">
+      <div class="workspace-head">
+        <div><div class="eyebrow" id="workspaceEyebrow">CHARACTER WORKSPACE</div><h1 id="workspaceTitle">Character Creator</h1></div>
+        <div class="head-tools"><span class="pill" id="projectName">Untitled Project</span><button id="fitStage" class="icon-btn" title="Vừa sân khấu">⌗</button><button id="toggleGrid" class="icon-btn" title="Lưới">▦</button></div>
+      </div>
+      <div class="stage-wrap">
+        <div class="stage-toolbar"><span>STAGE <b>1920 × 1080</b></span><div><button id="stageZoomOut">−</button><span id="zoomValue">100%</span><button id="stageZoomIn">＋</button></div></div>
+        <div class="stage-area" id="stageArea">
+          <canvas id="stage" width="1920" height="1080"></canvas>
+          <div id="stageEmpty" class="stage-empty"><div class="empty-orbit">✳</div><b>Sân khấu đang trống</b><span>Nhập thư mục PNG hoặc tạo nhân vật để bắt đầu.</span><button id="stageImport" class="primary">Nhập thư mục ảnh</button></div>
+        </div>
+        <div class="stage-footer"><span id="stageStatus">No selection</span><span>Canvas 2D · Preview renderer</span></div>
+      </div>
+      <div class="timeline">
+        <div class="timeline-head"><div><b>TIMELINE</b><span class="muted" id="durationLabel">00:00 / 00:08</span></div>
+          <div class="transport"><button id="toStart">|◀</button><button id="prevFrame">◀</button><button id="playButton" class="play">▶</button><button id="nextFrame">▶</button><button id="toEnd">▶|</button><span class="fps">30 FPS</span></div>
+          <div class="timeline-actions"><button id="addKeyframe">◆ Keyframe</button><button id="addClip">＋ Clip</button></div>
+        </div>
+        <div class="timeline-ruler" id="ruler"></div>
+        <div id="tracks" class="tracks">
+          <div class="track-labels"><div>Character / Root</div><div>Face / Expression</div><div>Audio / Dialogue</div></div>
+          <div class="track-lanes"><div class="lane" data-track="root"></div><div class="lane" data-track="face"></div><div class="lane" data-track="audio"></div></div>
+        </div>
+      </div>
+    </section>
+    <aside class="inspector">
+      <div class="inspector-head"><span>INSPECTOR</span><span class="tiny-status">LIVE</span></div>
+      <div class="inspector-tabs"><button class="active" data-inspector="transform">Transform</button><button data-inspector="layers">Layers</button><button data-inspector="rig">Rig</button></div>
+      <div id="inspectorContent" class="inspector-content"></div>
+      <div class="inspector-bottom"><button id="deleteSelection" class="danger">Xóa lựa chọn</button></div>
+    </aside>
+  </main>
+  <section id="scriptWorkspace" class="script-workspace hidden">
+    <div class="script-head"><div><div class="eyebrow">SCRIPT TO ANIMATION</div><h2>Biến kịch bản thành cảnh phim</h2><p>Nhập mô tả tiếng Việt. Bộ phân tích sẽ tạo kế hoạch sự kiện JSON để bạn kiểm tra trước khi chạy.</p></div><div class="script-actions"><button id="analyzeScript" class="primary">✦ Phân tích kịch bản</button><button id="runPlan">Chạy kế hoạch</button></div></div>
+    <div class="script-grid">
+      <div class="script-editor"><label>KỊCH BẢN</label><textarea id="scriptInput" placeholder="Ví dụ: An đang đứng trong phòng. Lan bước vào, vui vẻ vẫy tay chào. An quay đầu nhìn Lan rồi mỉm cười."></textarea><div class="script-note">Mẹo: dùng tên nhân vật đã tạo và mô tả hành động theo thứ tự.</div></div>
+      <div class="json-editor"><label>KẾ HOẠCH JSON</label><pre id="jsonOutput">{
+  "version": 1,
+  "scenes": []
+}</pre><div id="analysisMessage" class="script-note">Chưa có kết quả phân tích.</div></div>
+    </div>
+  </section>
+  <section id="filmWorkspace" class="film-workspace hidden">
+    <div class="script-head"><div><div class="eyebrow">FILM EDITOR</div><h2>Dựng phim nhiều cảnh</h2><p>Quản lý cảnh, thời lượng và thứ tự phát. Các cảnh sử dụng cùng bộ máy Canvas.</p></div><button id="filmAddScene" class="primary">＋ Thêm cảnh</button></div>
+    <div id="filmSceneCards" class="film-cards"></div>
+  </section>
+  <footer class="statusbar"><span id="statusMessage">Sẵn sàng</span><span id="memoryStatus">Local project · IndexedDB</span><span>Anime 2D Studio v1.0</span></footer>
+</div>
+<div id="toast" class="toast"></div>
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><b id="modalTitle">Thông tin</b><button id="modalClose">×</button></div><div id="modalBody"></div></div></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
