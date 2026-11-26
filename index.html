@@ -524,6 +524,7 @@ function pick(e){
   const r=cv.getBoundingClientRect();
   ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
   ray.setFromCamera(ndc,camera);
+  for(const m of meshes)if(m.isSkinnedMesh){m.skeleton.update();m.boundingSphere=null;m.boundingBox=null}
   const h=ray.intersectObjects(meshes,false)[0];
   if(h&&h.object!==cur){cur=h.object;$('meshSel').value=String(meshes.indexOf(cur));refresh()}
   return h;
@@ -533,6 +534,7 @@ function cancelStroke(){
   if(mode==='paint'&&performance.now()-strokeT<250){const p=cur&&paintOf(cur);if(p&&p.undo.length){p.ctx.putImageData(p.undo.pop(),0,0);p.tex.needsUpdate=true;queueUV()}}
 }
 cv.addEventListener('pointerdown',e=>{
+  if(e.isPrimary){ptrs.clear();maxP=0}
   ptrs.add(e.pointerId);maxP=Math.max(maxP,ptrs.size);
   if(ptrs.size>1){cancelStroke();pd=null;return}
   if(mode==='select'||mode==='eye'){pd={x:e.clientX,y:e.clientY};return}
@@ -552,7 +554,11 @@ function endPtr(e,tap){
   if(down&&e.pointerId===strokeId){down=false;controls.enabled=true;last=null}
   if(tap&&(mode==='select'||mode==='eye')&&pd&&!multi){
     const moved=Math.hypot(e.clientX-pd.x,e.clientY-pd.y);
-    if(moved<(e.pointerType==='touch'?10:5)&&!tc.dragging&&tc.axis===null&&root){const h=pick(e);if(mode==='eye')placeEye(h);else selectObj(h?($('pickBy').value==='root'?root:h.object):null)}
+    if(moved<(e.pointerType==='touch'?16:5)&&!tc.dragging&&tc.axis===null&&root){
+      const h=pick(e);
+      if(mode==='eye'){if(h){placeEye(h);say('Đã đặt vùng mắt. Chỉnh “Vùng mắt” rồi bấm ② Tạo key.')}else say('Chạm trượt: không trúng mô hình. Thử chạm lại vào mắt.')}
+      else selectObj(h?($('pickBy').value==='root'?root:h.object):null)
+    }else if(mode==='eye')say('Ngón tay bị lướt. Hãy chạm nhẹ, không kéo.')
   }
   if(!ptrs.size)pd=null;
 }
