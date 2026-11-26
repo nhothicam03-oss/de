@@ -90,7 +90,7 @@ input[type=color]{padding:0;height:34px;width:48px;flex:none}
 <main>
   <div id="vp">
     <div id="fl">
-      <div class="seg" id="tools"><button data-m="select" class="on">Chọn</button><button data-m="paint">Vẽ</button><button data-m="sculpt">Sculpt</button></div>
+      <div class="seg" id="tools"><button data-m="select" class="on">Chọn</button><button data-m="paint">Vẽ</button><button data-m="sculpt">Sculpt</button><button data-m="eye">Mắt</button></div>
       <div class="seg" id="gz" data-for="select"><button data-g="translate" class="on">Di chuyển</button><button data-g="rotate">Xoay</button><button data-g="scale">Tỉ lệ</button></div>
       <label class="tgl" data-for="select"><input type="checkbox" id="lock" aria-label="Khoá gizmo"><span>🔒 Khoá</span></label>
       <button id="undoQ" data-for="paint" hidden>↶ Hoàn tác</button>
@@ -140,9 +140,16 @@ input[type=color]{padding:0;height:34px;width:48px;flex:none}
         <div class="note">Lệnh UV áp dụng cho cả mesh, quanh tâm (0.5, 0.5).</div>
       </section>
       <section class="pane" data-p="key">
-        <h3>Shape key</h3>
+        <h3>Key mắt nhanh</h3>
+        <div class="row"><label>Mắt</label><select id="eyeSide"><option>Mắt trái</option><option>Mắt phải</option><option>Hai mắt</option></select></div>
+        <div class="row"><label>Vùng mắt</label><input type="range" id="eyeR" min="1" max="40" value="8"></div>
+        <div class="row"><button id="eyeGo">① Chạm lên mắt</button><button id="eyeMake">② Tạo key</button></div>
+        <div class="row"><button id="blink">Chớp thử</button><button id="eyeClr">Xoá vùng</button></div>
+        <div class="note" id="eyeInfo">Bấm ①, chạm vào giữa con mắt (hai mắt thì chạm lần lượt hai bên). Chỉnh vòng vàng vừa quanh mắt bằng thanh “Vùng mắt”, rồi bấm ② để tạo 3 key: nhắm, nheo, mở to.</div>
+        <h3>Danh sách key</h3>
         <div id="keys"></div>
-        <div class="row"><button id="addKey">+ Tạo shape key</button><button id="clrKey">Đặt lại key</button></div>
+        <h3>Tự tạo và sculpt</h3>
+        <div class="row"><button id="addKey">+ Tạo key trống</button><button id="clrKey">Đặt lại key</button></div>
         <div class="row"><label>Sculpt vào</label><select id="skSel"></select></div>
         <div class="note">Chọn công cụ “Sculpt”, rồi kéo một ngón trên mô hình để đẩy ra. Trên máy tính giữ Alt để ép vào.</div>
       </section>
@@ -180,19 +187,19 @@ renderer.setAnimationLoop(()=>{controls.update();if(box)box.update();renderer.re
 
 let msgT;function say(t){const m=$('msg');m.textContent=t;m.classList.add('show');clearTimeout(msgT);msgT=setTimeout(()=>m.classList.remove('show'),2600)}
 const mat=m=>m&&(Array.isArray(m.material)?m.material[0]:m.material);
-const hintText={select:'Chạm vào mô hình để chọn. Kéo chỗ trống để xoay camera, cuộn hoặc chụm hai ngón để zoom.',paint:'Kéo trên mô hình để vẽ. Ctrl+Z hoàn tác.',sculpt:'Kéo trên mô hình để sculpt vào shape key đang chọn.'};
+const hintText={select:'Chạm vào mô hình để chọn. Kéo chỗ trống để xoay camera, cuộn hoặc chụm hai ngón để zoom.',paint:'Kéo trên mô hình để vẽ. Ctrl+Z hoàn tác.',sculpt:'Kéo trên mô hình để sculpt vào shape key đang chọn.',eye:'Chạm vào giữa con mắt để đặt vùng (vòng vàng). Kéo chỗ trống để xoay camera.'};
 function setMode(m){
   mode=m;
   document.querySelectorAll('#tools button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
   document.querySelectorAll('[data-for]').forEach(el=>el.hidden=!el.dataset.for.split(' ').includes(m));
   $('hint').textContent=hintText[m];
   renderer.domElement.style.cursor=m==='select'?'default':'crosshair';
-  applyTouch();showPane({select:'sel',paint:'paint',sculpt:'key'}[m]);applyGizmoState();
+  applyTouch();showPane({select:'sel',paint:'paint',sculpt:'key',eye:'key'}[m]);applyGizmoState();
 }
 
 /* ---------- Nạp mô hình ---------- */
 function setModel(obj,anims){
-  selectObj(null);
+  selectObj(null);clearEye();
   if(root)scene.remove(root);
   if(skel){scene.remove(skel);skel.dispose();skel=null}
   clips=anims||[];
@@ -340,15 +347,77 @@ function renderKeys(){
     box.appendChild(d);
   }
 }
+function pushKey(mesh,name,arr){
+  const g=mesh.geometry,pos=g.attributes.position,n=pos.count,old=(mesh.morphTargetInfluences||[]).slice();
+  let k=name,i=2;while(mesh.morphTargetDictionary&&k in mesh.morphTargetDictionary)k=name+' '+i++;
+  const mp=g.morphAttributes.position;
+  if(mp&&mp.length&&!g.morphTargetsRelative){
+    mp.forEach(a=>{for(let v=0;v<n;v++)a.setXYZ(v,a.getX(v)-pos.getX(v),a.getY(v)-pos.getY(v),a.getZ(v)-pos.getZ(v))});
+    const nor=g.attributes.normal,mn=g.morphAttributes.normal;
+    if(nor&&mn)mn.forEach(a=>{for(let v=0;v<n;v++)a.setXYZ(v,a.getX(v)-nor.getX(v),a.getY(v)-nor.getY(v),a.getZ(v)-nor.getZ(v))});
+  }
+  const a=new THREE.Float32BufferAttribute(arr||new Float32Array(n*3),3);a.name=k;
+  (g.morphAttributes.position=g.morphAttributes.position||[]).push(a);
+  if(g.morphAttributes.normal)g.morphAttributes.normal.push(new THREE.Float32BufferAttribute(new Float32Array(n*3),3));
+  g.morphTargetsRelative=true;mesh.updateMorphTargets();old.forEach((v,j)=>mesh.morphTargetInfluences[j]=v);g.dispose();
+  return mesh.morphTargetInfluences.length-1;
+}
 $('addKey').onclick=()=>{
   if(!cur)return say('Chưa chọn mesh.');
   const name=prompt('Tên shape key mới:','Key '+(keyNames(cur).length+1));if(!name)return;
-  const g=cur.geometry,n=g.attributes.position.count,old=(cur.morphTargetInfluences||[]).slice();
-  const a=new THREE.Float32BufferAttribute(new Float32Array(n*3),3);a.name=name;
-  (g.morphAttributes.position=g.morphAttributes.position||[]).push(a);
-  if(g.morphAttributes.normal)g.morphAttributes.normal.push(new THREE.Float32BufferAttribute(new Float32Array(n*3),3));
-  g.morphTargetsRelative=true;cur.updateMorphTargets();old.forEach((v,i)=>cur.morphTargetInfluences[i]=v);g.dispose();
-  renderKeys();$('skSel').value=String(cur.morphTargetInfluences.length-1);say('Đã tạo “'+name+'”. Chọn Sculpt key để chỉnh hình.');
+  const idx=pushKey(cur,name);
+  renderKeys();$('skSel').value=String(idx);say('Đã tạo “'+name+'”. Chọn công cụ Sculpt để chỉnh hình.');
+};
+/* ---------- Key mắt nhanh: nhắm / nheo / mở to ---------- */
+const eyePts=[],eyeGeo=new THREE.SphereGeometry(1,16,12),eyeMat=new THREE.MeshBasicMaterial({color:0xffd34d,wireframe:true,transparent:true,opacity:.75,depthTest:false});
+const eyeNeed=()=>$('eyeSide').value==='Hai mắt'?2:1;
+function eyeRadius(mesh){const g=mesh.geometry;if(!g.boundingSphere)g.computeBoundingSphere();return g.boundingSphere.radius*$('eyeR').value/100}
+function updateEyeMarkers(){
+  for(const p of eyePts){p.marker.position.copy(p.mesh.localToWorld(p.local.clone()));p.marker.scale.setScalar(eyeRadius(p.mesh)*p.mesh.matrixWorld.getMaxScaleOnAxis())}
+  $('eyeInfo').textContent=eyePts.length?'Đã đặt '+eyePts.length+'/'+eyeNeed()+' vùng. Chỉnh “Vùng mắt” cho vòng vàng vừa quanh mắt, rồi bấm ② Tạo key.':'Bấm ①, chạm vào giữa con mắt (hai mắt thì chạm lần lượt hai bên). Chỉnh vòng vàng vừa quanh mắt bằng thanh “Vùng mắt”, rồi bấm ② để tạo 3 key: nhắm, nheo, mở to.';
+}
+function clearEye(){for(const p of eyePts)scene.remove(p.marker);eyePts.length=0;updateEyeMarkers()}
+function placeEye(h){
+  if(!h)return;
+  if(eyePts.length&&eyePts[0].mesh!==h.object)clearEye();
+  const local=h.object.worldToLocal(h.point.clone());
+  if(eyePts.length<eyeNeed()){const marker=new THREE.Mesh(eyeGeo,eyeMat);marker.renderOrder=999;scene.add(marker);eyePts.push({mesh:h.object,local,marker})}
+  else{let best=eyePts[0],bd=1e9;for(const p of eyePts){const d=p.marker.position.distanceTo(h.point);if(d<bd){bd=d;best=p}}best.local=local}
+  updateEyeMarkers();
+}
+$('eyeGo').onclick=()=>{if(!root)return say('Hãy mở mô hình trước.');setMode('eye');say('Chạm vào giữa con mắt.')};
+$('eyeR').oninput=updateEyeMarkers;
+$('eyeSide').onchange=()=>{clearEye()};
+$('eyeClr').onclick=clearEye;
+$('eyeMake').onclick=()=>{
+  if(eyePts.length<eyeNeed())return say('Cần chạm đủ '+eyeNeed()+' vùng mắt (bấm ① rồi chạm lên mô hình).');
+  const mesh=eyePts[0].mesh,g=mesh.geometry,pos=g.attributes.position,n=pos.count,R=eyeRadius(mesh),prefix=$('eyeSide').value;
+  const up=new THREE.Vector3(0,1,0).transformDirection(new THREE.Matrix4().copy(mesh.matrixWorld).invert());
+  const kinds=[['nhắm',.94],['nheo',.55],['mở to',-.35]],pts=eyePts.map(p=>p.local),v=new THREE.Vector3();
+  let first=-1;
+  for(const [label,k] of kinds){
+    const arr=new Float32Array(n*3);
+    for(let i=0;i<n;i++){
+      v.fromBufferAttribute(pos,i);
+      for(const c of pts){
+        const d=v.distanceTo(c);if(d>=R)continue;
+        const x=d/R,t=Math.min(1,Math.max(0,(x-.5)/.5)),w=1-t*t*(3-2*t),h=(v.x-c.x)*up.x+(v.y-c.y)*up.y+(v.z-c.z)*up.z,m=-h*k*w;
+        arr[i*3]+=up.x*m;arr[i*3+1]+=up.y*m;arr[i*3+2]+=up.z*m;
+      }
+    }
+    const idx=pushKey(mesh,prefix+' '+label,arr);if(first<0)first=idx;
+  }
+  cur=mesh;$('meshSel').value=String(meshes.indexOf(mesh));clearEye();renderKeys();$('skSel').value=String(first);
+  setMode('select');showPane('key');say('Đã tạo 3 key cho “'+prefix+'”. Kéo thanh trượt hoặc bấm Chớp thử để xem.');
+};
+$('blink').onclick=()=>{
+  if(!cur||!cur.morphTargetInfluences)return say('Mesh này chưa có shape key.');
+  const ks=keyNames(cur).filter(([n])=>/nhắm|blink|close/i.test(n));
+  const idxs=ks.length?ks.map(k=>k[1]):($('skSel').value!==''?[+$('skSel').value]:[]);
+  if(!idxs.length)return say('Chưa có key nhắm mắt để thử.');
+  const base=idxs.map(i=>cur.morphTargetInfluences[i]),t0=performance.now(),mesh=cur;
+  (function f(){const u=Math.min(1,(performance.now()-t0)/520),w=Math.sin(u*Math.PI);idxs.forEach(i=>mesh.morphTargetInfluences[i]=w);
+    if(u<1)requestAnimationFrame(f);else{idxs.forEach((i,j)=>mesh.morphTargetInfluences[i]=base[j]);if(mesh===cur)renderKeys()}})();
 };
 $('clrKey').onclick=()=>{
   if(!cur||$('skSel').value==='')return;
@@ -441,8 +510,8 @@ $('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(b
 $('fold').onclick=()=>{const m=sheet.classList.toggle('min');$('fold').textContent=m?'▴':'▾'};
 let camTwo='rotate';
 function applyTouch(){
-  controls.touches.ONE=mode==='select'?THREE.TOUCH.ROTATE:-1;
-  controls.touches.TWO=mode==='select'?THREE.TOUCH.DOLLY_PAN:(camTwo==='rotate'?THREE.TOUCH.DOLLY_ROTATE:THREE.TOUCH.DOLLY_PAN);
+  const nav=mode==='select'||mode==='eye';controls.touches.ONE=nav?THREE.TOUCH.ROTATE:-1;
+  controls.touches.TWO=nav?THREE.TOUCH.DOLLY_PAN:(camTwo==='rotate'?THREE.TOUCH.DOLLY_ROTATE:THREE.TOUCH.DOLLY_PAN);
 }
 $('cam2').onclick=()=>{camTwo=camTwo==='rotate'?'pan':'rotate';$('cam2').textContent='2 ngón: '+(camTwo==='rotate'?'xoay':'dịch');applyTouch()};
 $('undoQ').onclick=()=>undoPaint();
@@ -466,7 +535,7 @@ function cancelStroke(){
 cv.addEventListener('pointerdown',e=>{
   ptrs.add(e.pointerId);maxP=Math.max(maxP,ptrs.size);
   if(ptrs.size>1){cancelStroke();pd=null;return}
-  if(mode==='select'){pd={x:e.clientX,y:e.clientY};return}
+  if(mode==='select'||mode==='eye'){pd={x:e.clientX,y:e.clientY};return}
   if(!root)return;
   const h=pick(e);if(!h)return;
   if(e.pointerType!=='touch'){controls.enabled=false;cv.setPointerCapture(e.pointerId)}
@@ -481,9 +550,9 @@ cv.addEventListener('pointermove',e=>{
 function endPtr(e,tap){
   const multi=maxP>1;ptrs.delete(e.pointerId);if(!ptrs.size)maxP=0;
   if(down&&e.pointerId===strokeId){down=false;controls.enabled=true;last=null}
-  if(tap&&mode==='select'&&pd&&!multi){
+  if(tap&&(mode==='select'||mode==='eye')&&pd&&!multi){
     const moved=Math.hypot(e.clientX-pd.x,e.clientY-pd.y);
-    if(moved<(e.pointerType==='touch'?10:5)&&!tc.dragging&&tc.axis===null&&root){const h=pick(e);selectObj(h?($('pickBy').value==='root'?root:h.object):null)}
+    if(moved<(e.pointerType==='touch'?10:5)&&!tc.dragging&&tc.axis===null&&root){const h=pick(e);if(mode==='eye')placeEye(h);else selectObj(h?($('pickBy').value==='root'?root:h.object):null)}
   }
   if(!ptrs.size)pd=null;
 }
